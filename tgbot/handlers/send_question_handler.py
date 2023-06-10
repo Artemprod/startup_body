@@ -1,5 +1,7 @@
+import itertools
+from time import sleep
 
-from tgbot.models.questions import questions as QUESTIONS
+from tgbot.models.questions import questions as QUESTIONS, questions
 from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command, CommandStart, StateFilter
@@ -14,6 +16,28 @@ from aiogram.fsm.context import FSMContext
 from tgbot.states import FSMFillForm
 
 router = Router()
+
+
+
+@router.message(Text(text=['поехали', 'погнали', 'да']))
+async def send_questions(message: Message):
+    stop = 0
+    for number, question in itertools.cycle(questions.items()):
+        if stop == 1:
+            break
+        q = (f'<b>Вопрос:</b> {question["question"]}\n\n'
+             f'<b>Полезность:</b> {question["usefulness"]}\n'
+             f'<b>Метрика:</b> {question["metric"]}\n'
+             f'<b>Категория:</b> {question["category"]}\n'
+
+             f'<b>Стадия:</b> {question["stage"]}')
+
+        await message.answer(f'{number} \n{q}', parse_mode='HTML')
+        sleep(24 * 60 * 60)
+
+
+
+
 
 
 # Этот хэндлер будет срабатывать, если введено корректное имя

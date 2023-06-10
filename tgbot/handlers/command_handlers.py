@@ -37,21 +37,8 @@ async def process_start_command(message: Message,state: FSMContext):
     # await message.answer(f'{BotAnswers.QUESTION_PROBLEM.value}'
     #                      ,
     #                      parse_mode="HTML")
-    q = f'Вопрос ' \
-        f'Полезность' \
-        f'Метрика' \
-        f'Категория' \
-        f'Стадия'
-    for number, question in itertools.cycle(questions.items()):
-        q = (f'<b>Вопрос:</b> {question["question"]}\n\n'
-             f'<b>Полезность:</b> {question["usefulness"]}\n'
-             f'<b>Метрика:</b> {question["metric"]}\n'
-             f'<b>Категория:</b> {question["category"]}\n'
-             
-             f'<b>Стадия:</b> {question["stage"]}')
 
-        await message.answer(f'{number} \n{q}',parse_mode='HTML')
-        sleep(24 * 60 * 60)
+
 
 
 # Этот хэндлер будет срабатывать на команду "/help"

@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from config import load_config
-from tgbot.handlers import command_handlers
+from tgbot.handlers import command_handlers, send_question_handler
 from aiogram.fsm.storage.memory import MemoryStorage
 
 async def main() -> None:
@@ -11,6 +11,7 @@ async def main() -> None:
 
     dp: Dispatcher = Dispatcher()
     dp.include_router(command_handlers.router)
+    dp.include_router(send_question_handler.router)
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
