@@ -1,91 +1,68 @@
 import itertools
-from time import sleep
+from asyncio import sleep
+from random import randint
 
+from tgbot.filters.message_from_bot import ReplyFilterBot
+from tgbot.models.bot_variables import BotAnswers
 from tgbot.models.questions import questions as QUESTIONS, questions
 from aiogram import Router
-from aiogram.fsm.context import FSMContext
+
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.types import Message
 from aiogram.fsm.state import default_state
-
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart, StateFilter, Text
-
 from aiogram.fsm.context import FSMContext
 
-from tgbot.states import FSMFillForm
+from tgbot.models.users import users
+from tgbot.states import  FSMSendQuestions
 
 router = Router()
 
 
 
-@router.message(Text(text=['поехали', 'погнали', 'да']))
-async def send_questions(message: Message):
-    stop = 0
-    for number, question in itertools.cycle(questions.items()):
-        if stop == 1:
-            break
-        q = (f'<b>Вопрос:</b> {question["question"]}\n\n'
-             f'<b>Полезность:</b> {question["usefulness"]}\n'
-             f'<b>Метрика:</b> {question["metric"]}\n'
-             f'<b>Категория:</b> {question["category"]}\n'
+@router.callback_query(Text(text='begin'),
+                       )
+async def process_send_question(message: Message, state: FSMContext, bot: Bot):
+    sent_questions: list = users[message.from_user.id]['sent_questions']
 
-             f'<b>Стадия:</b> {question["stage"]}')
+@router.message(StateFilter(FSMSendQuestions.QUESTION_SENT), )
+async def process_send_question(message: Message, state: FSMContext, bot: Bot):
+    print(message)
+    await bot.send_chat_action(chat_id=message.chat.id, action='typing')
+    sent_questions: list = users[message.from_user.id]['sent_questions']
+    if len(sent_questions) == 30:
+        await state.set_state(FSMSendQuestions.OBSERVE_ANSWERS)
+    number_of_question = randint(0, len(questions.keys()))
+    if number_of_question in sent_questions:
+        number_of_question = randint(0, len(questions.keys()))
+    question_to_send = (f'{BotAnswers.QUESTION_TO_SEND_QUESTION.value} {questions[number_of_question]["question"]}\n\n'
+                        f'{BotAnswers.QUESTION_TO_SEND_USEFULNESS.value} {questions[number_of_question]["usefulness"]}\n'
+                        f'{BotAnswers.QUESTION_TO_SEND_METRIC.value} {questions[number_of_question]["metric"]}\n'
+                        f'{BotAnswers.QUESTION_TO_SEND_CATEGORY.value} {questions[number_of_question]["category"]}\n'
+                        f'{BotAnswers.QUESTION_TO_SEND_STAGE.value} {questions[number_of_question]["stage"]}')
+    sent_questions.append(number_of_question)
 
-        await message.answer(f'{number} \n{q}', parse_mode='HTML')
-        sleep(24 * 60 * 60)
+    await state.update_data(number_of_question=number_of_question)
+    await bot.send_message(chat_id=message.chat.id, text=question_to_send,)
+    await bot.send_chat_action(chat_id=message.chat.id, action='typing')
+    await sleep(1)
+    await bot.send_message(chat_id=message.chat.id, text='Жду ответ',)
+    await state.update_data(answer=message.text)
+    users[message.from_user.id]['answers'] = await state.get_data()
+    await state.set_state(FSMSendQuestions.QUESTION_SENT)
 
 
 
+@router.message(StateFilter(FSMSendQuestions.WAITING_ANSWER))
+async def process_write_answer(message: Message, state: FSMContext, bot: Bot):
+    await state.update_data(answer=message.text)
+    users[message.from_user.id]['answers'] = await state.get_data()
+    await state.set_state(FSMSendQuestions.QUESTION_SENT)
 
 
-
-# Этот хэндлер будет срабатывать, если введено корректное имя
-# и переводить в состояние ожидания ввода возраста
-@router.message(StateFilter(FSMFillForm.QUESTION_PROBLEM))
-async def process_name_sent(message: Message, state: FSMContext):
-    print()
-    # Cохраняем введенное имя в хранилище по ключу "name"
-    await state.update_data(name=message.text)
-    await message.answer(text='Спасибо!\n\nА теперь введите ваш возраст')
-    # Устанавливаем состояние ожидания ввода возраста
-    await state.set_state(FSMFillForm.QUESTION_HAVE_PARTNER)
-
-@router.message(StateFilter(FSMFillForm.QUESTION_HAVE_PARTNER))
-async def process_name_sent(message: Message, state: FSMContext):
-    # Cохраняем введенное имя в хранилище по ключу "name"
-    await state.update_data(name=message.text)
-    await message.answer(text='Спасибо!\n\nА теперь введите ваш возраст')
-    # Устанавливаем состояние ожидания ввода возраста
-    await state.set_state(FSMFillForm.QUESTION_PRODUCT_STAGE)
-
-@router.message(StateFilter(FSMFillForm.QUESTION_PRODUCT_STAGE), F.text.isalpha())
-async def process_name_sent(message: Message, state: FSMContext):
-    # Cохраняем введенное имя в хранилище по ключу "name"
-    await state.update_data(name=message.text)
-    await message.answer(text='Спасибо!\n\nА теперь введите ваш возраст')
-    # Устанавливаем состояние ожидания ввода возраста
-    await state.set_state(FSMFillForm.QUESTION_ROLE)
-
-@router.message(StateFilter(FSMFillForm.QUESTION_ROLE), F.text.isalpha())
-async def process_name_sent(message: Message, state: FSMContext):
-    # Cохраняем введенное имя в хранилище по ключу "name"
-    await state.update_data(name=message.text)
-    await message.answer(text='Спасибо!\n\nА теперь введите ваш возраст')
-    # Устанавливаем состояние ожидания ввода возраста
-    await state.set_state(FSMFillForm.QUESTION_PERSONAL_PROBLEMS)
-
-@router.message(StateFilter(FSMFillForm.QUESTION_ROLE), F.text.isalpha())
-async def process_name_sent(message: Message, state: FSMContext):
-    # Cохраняем введенное имя в хранилище по ключу "name"
-    await state.update_data(name=message.text)
-    await message.answer(text='Спасибо!\n\nА теперь введите ваш возраст')
-    # Устанавливаем состояние ожидания ввода возраста
-    await state.set_state(FSMFillForm.SEND_QUESTIONS)
-
-@router.message(StateFilter(FSMFillForm.QUESTION_ROLE), F.text.isalpha())
-async def process_name_sent(message: Message, state: FSMContext):
-    # Cохраняем введенное имя в хранилище по ключу "name"
-    await state.update_data(name=message.text)
-    await message.answer(text=f'{QUESTIONS[1]}')
-    # Устанавливаем состояние ожидания ввода возраста
+@router.message(StateFilter(FSMSendQuestions.OBSERVE_ANSWERS))
+async def process_send_question_1(message: Message, state: FSMContext, bot: Bot):
+    user_answers = users[message.from_user.id]['answers']
+    await message.answer(user_answers)
+    await state.set_state(FSMSendQuestions.QUESTION_SENT)
